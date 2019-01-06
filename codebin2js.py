@@ -40,7 +40,7 @@ for i in range(j, 0x8000, 4):
     nop += "0x60, 0x00, 0x00, 0x00, "
 nop += "\n"
 
-print "["
-print nop
-print payload
-print "]"
+print("[")
+#print(nop)
+print(payload)
+print("]")
