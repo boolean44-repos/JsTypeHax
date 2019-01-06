@@ -1,12 +1,12 @@
 # JsTypeHax
 
 Wii U browser exploit for system version 5.5.2 and 5.5.3.  
-This PoC currently uses the homebrew launcher 1.4 payload, you can find the original file [here](https://github.com/dimok789/homebrew_launcher/releases/download/1.4/codebin.zip) .   
-To create a own usable payload, grab any `code550.bin` and `wiiuhaxx_loader.bin` from the [wiiuhaxx_common repo](https://github.com/wiiu-env/wiiuhaxx_common/releases) and place it in root of this repo. 
-Afterwards you can convert it to a JS arrays using `codebin2js.py`, replace line 53-56 on the `index.html` with this output.
+Requires a valid payload ("code550.bin") in the root dir and the release files from the [wiiuhaxx_common repo](https://github.com/wiiu-env/wiiuhaxx_common/releases) inside a subfolder "wiiuhaxx_common".
 
-# Dependencies
-Python 3
+Tested with the [homebrew launcher 1.4 payload](https://github.com/dimok789/homebrew_launcher/releases/download/1.4/codebin.zip)
+
+# Requirements
+A webserver with php support.
 
 # The bug
 
