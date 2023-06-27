@@ -17,7 +17,7 @@ get into a limited, but stable one.
 
 # Useful tips
 
-- **Make sure to run the exploit via an link (like the `index.php`), visiting
+- **Make sure to run the exploit via a link (like the `index.php`), visiting
 the exploit page (`index-hax.php`) directly may fail.**  
 - If you have any issues, try to reset your browser save data.
 - Don't visit any other pages before doing the exploit (open browser -> open
